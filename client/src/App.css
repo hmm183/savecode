@@ -41,34 +41,30 @@ body {
   transition: background-color 0.2s, color 0.2s;
 }
 
+/* Main App Container */
 .app {
   max-width: 800px;
-  margin: 2rem auto;
+  margin: 1rem auto; /* Mobile-first margin */
   padding: 0 1rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: var(--shadow);
-  transition: background-color 0.2s, border-color 0.2s;
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.small {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-/* Header */
+/* Header & Navigation */
 .header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column; /* Stack on mobile */
   align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
 }
 .brand {
   display: flex;
@@ -77,12 +73,27 @@ body {
 }
 .brand h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
 }
 .controls {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+.controls a {
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s;
+}
+.controls a:hover {
+  color: var(--text-primary);
+}
+.controls a.active {
+  color: var(--brand-color);
+  background-color: rgba(59, 130, 246, 0.1);
 }
 .theme-toggle {
   background: none;
@@ -90,6 +101,16 @@ body {
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0;
+}
+
+/* Reusable Card */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 /* Form Elements */
@@ -101,7 +122,7 @@ body {
   color: var(--text-primary);
   border-radius: 6px;
   margin-top: 0.25rem;
-  box-sizing: border-box; /* Important */
+  box-sizing: border-box;
 }
 .form-input:focus, .form-textarea:focus {
   outline: none;
@@ -132,6 +153,10 @@ body {
 }
 
 /* File List & Items */
+.small {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
 .file-grid { display: flex; flex-direction: column; gap: 0.5rem; }
 .file-item {
   display: flex;
@@ -141,9 +166,33 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 .file-item:last-child { border-bottom: none; }
-.file-item-info h3 { margin: 0; font-size: 1rem; }
+.file-item-info {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0; /* Important fix for flexbox overflow */
+}
+.file-item-info h3 {
+  margin: 0;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap; /* Prevent title from wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-item-info h3 svg {
+  flex-shrink: 0;
+}
 .file-item-info p { margin: 0.25rem 0; color: var(--text-secondary); }
 .file-item-info small { color: var(--text-tertiary); }
+.file-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding-left: 1rem;
+}
 .download-button {
   padding: 0.4rem 0.8rem;
   border: none;
@@ -151,8 +200,21 @@ body {
   color: #fff;
   background-color: #10b981;
   cursor: pointer;
+  font-weight: 500;
 }
 .download-button:disabled { opacity: 0.5; cursor: wait; }
+.secondary-button {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: var(--input-border);
+  color: var(--text-primary);
+  border: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.secondary-button:hover { background-color: var(--border-color); }
+.secondary-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Search Bar */
 .search-bar { margin-bottom: 1rem; }
@@ -174,6 +236,7 @@ body {
   border-radius: 8px;
   width: 100%;
   max-width: 380px;
+  margin: 1rem;
 }
 .modal-content h2 { margin-top: 0; }
 .modal-error { color: #f87171; font-size: 0.875rem; margin-top: 0.5rem; }
@@ -183,8 +246,15 @@ body {
   justify-content: flex-end;
   gap: 0.5rem;
 }
-.modal-buttons button { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; }
+.modal-buttons button { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
 .modal-buttons .secondary-btn { background-color: var(--input-border); color: var(--text-primary); }
+
+/* About Page */
+.about-page { line-height: 1.6; }
+.about-page h2 { margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+.about-page h4 { margin-bottom: 0.5rem; }
+.about-page ul { padding-left: 20px; }
+.about-page li { margin-bottom: 0.5rem; }
 
 /* Footer */
 .footer {
@@ -194,32 +264,30 @@ body {
   color: var(--text-secondary);
 }
 
-
-/* Add these new styles to your src/App.css file */
-
-.file-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem; /* Adds space between the buttons */
+/* Media Queries for Responsiveness */
+@media (min-width: 768px) {
+  .app {
+    margin: 2rem auto; /* Restore larger margin on desktop */
+  }
+  .header {
+    flex-direction: row; /* Side-by-side on desktop */
+    justify-content: space-between;
+  }
+  .brand h1 {
+    font-size: 2rem;
+  }
 }
 
-/* A new style for a less prominent button */
-.secondary-button {
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  cursor: pointer;
-  background-color: var(--input-border); /* Use a neutral background */
-  color: var(--text-primary);
-  border: none;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.secondary-button:hover {
-  background-color: var(--border-color);
-}
-
-.secondary-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* ✅ FIX: Responsive layout for file items on small screens */
+@media (max-width: 480px) {
+  .file-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .file-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-left: 0;
+  }
 }
