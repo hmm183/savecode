@@ -1,10 +1,10 @@
-// src/containers/FileUploadContainer.jsx
+// src/containers/TextSnippetContainer.jsx
 import React, { useState } from "react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import FileUploadForm from "../components/FileUploadForm";
+import TextSnippetForm from "../components/TextSnippetForm";
 import { db } from "../firebaseConfig.js";
 
-// Utility: SHA-256 hashing (same as before)
+// Utility: SHA-256 hashing (can be moved to a shared utils file later)
 async function hashString(message) {
   if (!message) return "";
   const msgUint8 = new TextEncoder().encode(message);
@@ -13,18 +13,24 @@ async function hashString(message) {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export default function FileUploadContainer() {
+export default function TextSnippetContainer({ onSnippetCreated }) {
   const [uploading, setUploading] = useState(false);
   const [remaining, setRemaining] = useState(null);
   const [warningMessage, setWarningMessage] = useState("");
 
-  const handleSubmit = async ({ title, description, file, password }) => {
-    if (!file) {
-      alert("Please select a file to upload.");
+  const handleSubmit = async ({ title, body, password, extension }) => {
+    if (!title || !body) {
+      alert("Please provide a title and body for the snippet.");
       return;
     }
     setUploading(true);
+
     try {
+      let ext = extension ? String(extension).trim() : ".txt";
+      if (!ext.startsWith(".")) ext = "." + ext;
+      const safeTitle = title.trim().replace(/\s+/g, "_");
+      const filename = `${safeTitle}${ext}`;
+
       const workerUrl = "https://savecode-gatekeeper.vrishankraina.workers.dev";
       const signRes = await fetch(workerUrl, {
         method: "POST",
@@ -33,7 +39,7 @@ export default function FileUploadContainer() {
       });
 
       let signJson = null;
-      try { signJson = await signRes.json(); } catch (e) { throw new Error("Invalid response from signature endpoint"); }
+      try { signJson = await signRes.json(); } catch (e) { throw new Error("Invalid response from signature endpoint."); }
       if (!signRes.ok) {
         const serverMsg = signJson?.error || "Server permission denied.";
         const banExpires = signJson?.banExpires;
@@ -42,13 +48,10 @@ export default function FileUploadContainer() {
       }
 
       const { signature, timestamp, api_key, upload_preset, folder, public_id, resource_type, warning, remaining: remFromGatekeeper } = signJson;
-
       if (typeof remFromGatekeeper === "number") setRemaining(remFromGatekeeper);
       else if (typeof remFromGatekeeper === "string" && !isNaN(Number(remFromGatekeeper))) setRemaining(Number(remFromGatekeeper));
-      setWarningMessage(warning || "");
-
+      if (warning) setWarningMessage(warning); else setWarningMessage("");
       if (!signature || !timestamp || !api_key) throw new Error("Incomplete signed data received from gatekeeper.");
-
       if (warning) {
         const remainingText = typeof remFromGatekeeper === "number" ? ` (${remFromGatekeeper} remaining after this)` : "";
         const confirmMsg = `${warning}\n${remainingText}\n\nThis is the last allowed upload in the 24-hour window. Do you want to continue?`;
@@ -56,13 +59,17 @@ export default function FileUploadContainer() {
         if (!proceed) { setUploading(false); return; }
       }
 
-      // Upload
+      // Create text file
+      const textBlob = new Blob([body], { type: "text/plain" });
+      const textFile = new File([textBlob], filename, { type: "text/plain" });
+
       const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const rtype = resource_type || "image";
+      if (!cloudName) throw new Error("Cloudinary cloud name is not configured.");
+      const rtype = resource_type || "auto";
       const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${rtype}/upload`;
 
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", textFile);
       formData.append("api_key", api_key);
       formData.append("timestamp", timestamp);
       formData.append("signature", signature);
@@ -73,17 +80,15 @@ export default function FileUploadContainer() {
 
       const res = await fetch(uploadUrl, { method: "POST", body: formData });
       let cloudResp;
-      try { cloudResp = await res.json(); } catch (e) { throw new Error(`Upload failed: ${res.status} ${res.statusText}`); }
+      try { cloudResp = await res.json(); } catch (e) { throw new Error(`Cloudinary upload failed: ${res.status} ${res.statusText}`); }
       if (!res.ok) throw new Error(cloudResp?.error?.message || "Upload to Cloudinary failed");
       const data = cloudResp;
 
-      // Save only non-permanent metadata to Firestore (do NOT store permanent secure_url)
       const passwordHash = password ? await hashString(password) : "";
       const doc = {
-        title: title || file.name,
-        description: description || "",
-        filename: data.original_filename || file.name,
-        // DO NOT store data.secure_url here to avoid permanent URL exposure
+        title: title,
+        description: `Text snippet (${ext})`,
+        filename: filename,
         public_id: data.public_id,
         resource_type: data.resource_type || rtype,
         format: data.format,
@@ -96,19 +101,21 @@ export default function FileUploadContainer() {
 
       if (typeof remFromGatekeeper === "number") setRemaining(remFromGatekeeper);
       else setRemaining((prev) => (prev === null ? null : Math.max(0, prev - 1)));
+
       setWarningMessage("");
-      alert("File uploaded and published!");
+      alert("Text snippet saved successfully!");
+      if (onSnippetCreated) onSnippetCreated();
     } catch (err) {
       console.error(err);
-      alert("Upload failed: " + (err.message || err));
+      alert("Failed to save snippet: " + (err.message || err));
     } finally {
       setUploading(false);
     }
   };
 
-  // Banner styles (same as before)...
+  // Banner styles...
   const bannerStyle = {
-    padding: "10px 12px",
+    padding: "8px 12px",
     borderRadius: 6,
     marginBottom: 12,
     display: "flex",
@@ -140,7 +147,7 @@ export default function FileUploadContainer() {
         </div>
       )}
 
-      <FileUploadForm onSubmit={handleSubmit} uploading={uploading} />
+      <TextSnippetForm onSubmit={handleSubmit} uploading={uploading} />
     </div>
   );
 }

@@ -291,3 +291,42 @@ main {
     padding-left: 0;
   }
 }
+
+/* Add these styles to the end of src/App.css */
+
+/* Grid layout for the 'Create' page */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Style for the snippet textarea to look like a code editor */
+.snippet-body {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  background-color: var(--bg-primary) !important; /* Override default input bg */
+}
+
+/* Style for the select dropdown */
+select.form-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.dark select.form-input {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
