@@ -5,19 +5,13 @@ import { db } from "../firebaseConfig";
 import FileList from "../components/FileList";
 import SearchBar from "../components/SearchBar";
 
-// (Keep the hashString utility function as is)
-async function hashString(message) {
-  if (!message) return "";
-  const msgUint8 = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+const GATEKEEPER_URL = "https://savecode-gatekeeper.vrishankraina.workers.dev";
 
 export default function FileListContainer() {
   const [files, setFiles] = useState([]);
   const [queryText, setQueryText] = useState("");
-  const [downloadingSet, setDownloadingSet] = useState(new Set());
+  // track loading state per file id: "downloading" or "viewing" (string) or undefined
+  const [loadingById, setLoadingById] = useState({});
 
   useEffect(() => {
     const q = query(collection(db, "files"), orderBy("createdAt", "desc"));
@@ -28,59 +22,69 @@ export default function FileListContainer() {
     return () => unsub();
   }, []);
 
-  const setDownloading = (fileId, isOn) => {
-    setDownloadingSet((prev) => {
-      const copy = new Set(prev);
-      if (isOn) copy.add(fileId);
-      else copy.delete(fileId);
+  const setLoading = useCallback((fileId, action) => {
+    // action: undefined/null -> clear, otherwise string like "download" or "view"
+    setLoadingById(prev => {
+      const copy = { ...prev };
+      if (!action) delete copy[fileId];
+      else copy[fileId] = action;
       return copy;
     });
-  };
+  }, []);
 
-  // Worker endpoint (gatekeeper) - make sure this matches your deployed worker
-  const workerUrl = "https://savecode-gatekeeper.vrishankraina.workers.dev";
+  const isLoading = useCallback((fileId) => !!loadingById[fileId], [loadingById]);
 
+  /**
+   * Download handler:
+   * - Calls Worker to get signed URL, then fetches the Cloudinary URL as blob and triggers download.
+   * - Disables button and shows spinner while in progress.
+   */
   const handleDownload = useCallback(async (file, enteredPassword = "") => {
     if (!file || !file.id) return false;
-    setDownloading(file.id, true);
+    if (isLoading(file.id)) return false; // ignore if already loading
 
+    setLoading(file.id, "download");
     try {
-      // Request the Worker to stream the file (Worker will validate password and increment downloadCount)
-      const res = await fetch(workerUrl, {
+      const res = await fetch(GATEKEEPER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "download",
           fileId: file.id,
-          enteredPassword: enteredPassword || ""
+          enteredPassword: enteredPassword || "",
         }),
       });
 
+      let json;
+      try { json = await res.json(); } catch { json = null; }
+
       if (!res.ok) {
-        // try to parse body
-        let errJson = null;
-        try { errJson = await res.json(); } catch (e) { /* ignore */ }
-        const msg = (errJson && errJson.error) ? errJson.error : `Download failed (${res.status})`;
-        // If incorrect password, return false so modal can stay open
-        if (res.status === 401) {
-          return false;
-        }
-        throw new Error(msg);
+        const msg = json?.error || `Download failed with status ${res.status}`;
+        if (res.status === 401) return false; // password wrong -> keep modal open
+        alert("Download failed: " + msg);
+        return false;
       }
 
-      // Streamed binary response -> create blob and trigger download
-      const blob = await res.blob();
-      const disposition = res.headers.get("content-disposition") || "";
-      const match = disposition.match(/filename="(.+)"/);
-      const filename = match ? match[1] : (file.filename || "download");
+      const signedUrl = json?.url;
+      if (!signedUrl) {
+        alert("Download failed: Signed URL missing.");
+        return false;
+      }
 
+      // fetch file bytes
+      const blobRes = await fetch(signedUrl);
+      if (!blobRes.ok) {
+        alert("Download failed while fetching file from storage.");
+        return false;
+      }
+
+      const blob = await blobRes.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = filename;
+      a.download = file.filename || "download";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(a.href);
 
       return true;
     } catch (err) {
@@ -88,48 +92,56 @@ export default function FileListContainer() {
       alert("Download failed: " + (err.message || err));
       return false;
     } finally {
-      setDownloading(file.id, false);
+      setLoading(file.id, undefined);
     }
-  }, []);
+  }, [isLoading, setLoading]);
 
+  /**
+   * View handler:
+   * - Calls Worker; opens signed URL in new tab.
+   */
   const handleView = useCallback(async (file, enteredPassword = "") => {
     if (!file || !file.id) return false;
-    setDownloading(file.id, true);
+    if (isLoading(file.id)) return false;
 
+    setLoading(file.id, "view");
     try {
-      const res = await fetch(workerUrl, {
+      const res = await fetch(GATEKEEPER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "download",
           fileId: file.id,
-          enteredPassword: enteredPassword || ""
+          enteredPassword: enteredPassword || "",
         }),
       });
 
+      let json;
+      try { json = await res.json(); } catch { json = null; }
+
       if (!res.ok) {
-        let errJson = null;
-        try { errJson = await res.json(); } catch (e) {}
-        const msg = (errJson && errJson.error) ? errJson.error : `View failed (${res.status})`;
-        if (res.status === 401) return false;
-        throw new Error(msg);
+        const msg = json?.error || `View failed with status ${res.status}`;
+        if (res.status === 401) return false; // password wrong -> keep modal open
+        alert("View failed: " + msg);
+        return false;
       }
 
-      // We received the response stream -> create object URL and open in new tab
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
+      const signedUrl = json?.url;
+      if (!signedUrl) {
+        alert("View failed: Signed URL missing.");
+        return false;
+      }
 
-      // Don't increment client-side downloadCount — server has done so.
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
       return true;
     } catch (err) {
       console.error("View error:", err);
       alert("View failed: " + (err.message || err));
       return false;
     } finally {
-      setDownloading(file.id, false);
+      setLoading(file.id, undefined);
     }
-  }, []);
+  }, [isLoading, setLoading]);
 
   const filteredFiles = files.filter((f) => {
     if (!queryText) return true;
@@ -144,7 +156,7 @@ export default function FileListContainer() {
         files={filteredFiles}
         onDownload={handleDownload}
         onView={handleView}
-        isDownloading={(id) => downloadingSet.has(id)}
+        isLoading={(id) => loadingById[id] || null} // returns "download"|"view"|null
       />
     </div>
   );
