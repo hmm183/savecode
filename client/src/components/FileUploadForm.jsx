@@ -3,7 +3,12 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 
 export default function FileUploadForm({ onSubmit, uploading }) {
-  const { register, handleSubmit, reset } = useForm();
+  const { 
+    register, 
+    handleSubmit, 
+    reset,
+    formState: { errors } // ⬅️ NEW: Destructure errors to display message
+  } = useForm();
 
   const handleFormSubmit = (data) => {
     const file = data.file[0];
@@ -18,8 +23,23 @@ export default function FileUploadForm({ onSubmit, uploading }) {
         <input id="title" type="text" {...register('title')} className="form-input" placeholder="e.g., Q4 Financial Report" />
       </div>
       <div>
-        <label className="form-label" htmlFor="description">Description (Optional)</label>
-        <textarea id="description" {...register('description')} rows={3} className="form-textarea" placeholder="A brief description of the file." />
+        <label className="form-label" htmlFor="description">
+          Description (Optional) (Max 100 chars) {/* ⬅️ Updated Label */}
+        </label>
+        <textarea 
+          id="description" 
+          {...register('description', { 
+            maxLength: { // ⬅️ NEW: Validation Rule
+              value: 100, 
+              message: "Description must be 100 characters or less."
+            } 
+          })} 
+          rows={3} 
+          className="form-textarea" 
+          placeholder="A brief description of the file." 
+        />
+        {/* ⬅️ NEW: Display validation error message */}
+        {errors.description && <p className="modal-error">{errors.description.message}</p>}
       </div>
       <div>
         <label className="form-label" htmlFor="password">Password (Optional)</label>
